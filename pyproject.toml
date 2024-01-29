@@ -11,6 +11,8 @@ pandas = "^2.2.0"
 scipy = "^1.12.0"
 matplotlib = "^3.8.2"
 pydantic = "^2.5.3"
+polygon-api-client = "^1.13.4"
+yfinance = "^0.2.36"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -1,4 +1,3 @@
-from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -53,132 +52,129 @@ Strategy = StockStrategy | OptionStrategy | ClosedPosition
 
 class Inputs(BaseModel):
     """
-    stockprice : float
+    stock_price : float
             Spot price of the underlying.
-        volatility : float
-            Annualized volatility.
-        interestrate : float
-            Annualized risk-free interest rate.
-        minstock : float
-            Minimum value of the stock in the stock price domain.
-        maxstock : float
-            Maximum value of the stock in the stock price domain.
-        strategy : list
-            A Python list containing the strategy legs as Python dictionaries.
-            For options, the dictionary should contain up to 7 keys:
-                "type" : string
-                    Either 'call' or 'put'. It is mandatory.
-                "strike" : float
-                    Option strike price. It is mandatory.
-                "premium" : float
-                    Option premium. It is mandatory.
-                "n" : int
-                    Number of options. It is mandatory
-                "action" : string
-                    Either 'buy' or 'sell'. It is mandatory.
-                "prevpos" : float
-                    Premium effectively paid or received in a previously opened
-                    position. If positive, it means that the position remains
-                    open and the payoff calculation takes this price into
-                    account, not the current price of the option. If negative,
-                    it means that the position is closed and the difference
-                    between this price and the current price is considered in
-                    the payoff calculation.
-                "expiration" : string | int
-                    Expiration date in 'YYYY-MM-DD' format or number of days
-                    left before maturity, depending on the value in 'use_dates'
-                    (see below).
-            For stocks, the dictionary should contain up to 4 keys:
-                "type" : string
-                    It must be 'stock'. It is mandatory.
-                "n" : int
-                    Number of shares. It is mandatory.
-                "action" : string
-                    Either 'buy' or 'sell'. It is mandatory.
-                "prevpos" : float
-                    Stock price effectively paid or received in a previously
-                    opened position. If positive, it means that the position
-                    remains open and the payoff calculation takes this price
-                    into account, not the current price of the stock. If
-                    negative, it means that the position is closed and the
-                    difference between this price and the current price is
-                    considered in the payoff calculation.
-            For a non-determined previously opened position to be closed, which
-            might consist of any combination of calls, puts and stocks, the
-            dictionary must contain two keys:
-                "type" : string
-                    It must be 'closed'. It is mandatory.
-                "prevpos" : float
-                    The total value of the position to be closed, which can be
-                    positive if it made a profit or negative if it is a loss.
-                    It is mandatory.
-        dividendyield : float, optional
-            Annualized dividend yield. Default is 0.0.
-        profittarg : float, optional
-            Target profit level. Default is None, which means it is not
-            calculated.
-        losslimit : float, optional
-            Limit loss level. Default is None, which means it is not calculated.
-        optcommission : float
-            Broker commission for options transactions. Default is 0.0.
-        stockcommission : float
-            Broker commission for stocks transactions. Default is 0.0.
-        compute_the_greeks : logical, optional
-            Whether or not Black-Scholes formulas should be used to compute the
-            Greeks. Default is False.
-        compute_expectation : logical, optional
-            Whether or not the strategy's average profit and loss must be
-            computed from a numpy array of random terminal prices generated from
-            the chosen distribution. Default is False.
-        use_dates : logical, optional
-            Whether the target and maturity dates are provided or not. If False,
-            the number of days remaining to the target date and maturity are
-            provided. Default is True.
-        discard_nonbusinessdays : logical, optional
-            Whether to discard Saturdays and Sundays (and maybe holidays) when
-            counting the number of days between two dates. Default is True.
-        country : string, optional
-            Country for which the holidays will be considered if 'discard_nonbusinessdyas'
-            is True. Default is 'US'.
-        startdate : string, optional
-            Start date in the calculations, in 'YYYY-MM-DD' format. Default is "".
-            Mandatory if 'use_dates' is True.
-        targetdate : string, optional
-            Target date in the calculations, in 'YYYY-MM-DD' format. Default is "".
-            Mandatory if 'use_dates' is True.
-        days2targetdate : int, optional
-            Number of days remaining until the target date. Not considered if
-            'use_dates' is True. Default is 30 days.
-        distribution : string, optional
-            Statistical distribution used to compute probabilities. It can be
-            'black-scholes', 'normal', 'laplace' or 'array'. Default is 'black-scholes'.
-        nmcprices : int, optional
-            Number of random terminal prices to be generated when calculationg
-            the average profit and loss of a strategy. Default is 100,000.
+    volatility : float
+        Annualized volatility.
+    interest_rate : float
+        Annualized risk-free interest rate.
+    min_stock : float
+        Minimum value of the stock in the stock price domain.
+    max_stock : float
+        Maximum value of the stock in the stock price domain.
+    strategy : list
+        A Python list containing the strategy legs as Python dictionaries.
+        For options, the dictionary should contain up to 7 keys:
+            "type" : string
+                Either 'call' or 'put'. It is mandatory.
+            "strike" : float
+                Option strike price. It is mandatory.
+            "premium" : float
+                Option premium. It is mandatory.
+            "n" : int
+                Number of options. It is mandatory
+            "action" : string
+                Either 'buy' or 'sell'. It is mandatory.
+            "prevpos" : float
+                Premium effectively paid or received in a previously opened
+                position. If positive, it means that the position remains
+                open and the payoff calculation takes this price into
+                account, not the current price of the option. If negative,
+                it means that the position is closed and the difference
+                between this price and the current price is considered in
+                the payoff calculation.
+            "expiration" : string | int
+                Expiration date in 'YYYY-MM-DD' format or number of days
+                left before maturity, depending on the value in 'use_dates'
+                (see below).
+        For stocks, the dictionary should contain up to 4 keys:
+            "type" : string
+                It must be 'stock'. It is mandatory.
+            "n" : int
+                Number of shares. It is mandatory.
+            "action" : string
+                Either 'buy' or 'sell'. It is mandatory.
+            "prevpos" : float
+                Stock price effectively paid or received in a previously
+                opened position. If positive, it means that the position
+                remains open and the payoff calculation takes this price
+                into account, not the current price of the stock. If
+                negative, it means that the position is closed and the
+                difference between this price and the current price is
+                considered in the payoff calculation.
+        For a non-determined previously opened position to be closed, which
+        might consist of any combination of calls, puts and stocks, the
+        dictionary must contain two keys:
+            "type" : string
+                It must be 'closed'. It is mandatory.
+            "prevpos" : float
+                The total value of the position to be closed, which can be
+                positive if it made a profit or negative if it is a loss.
+                It is mandatory.
+    dividend_yield : float, optional
+        Annualized dividend yield. Default is 0.0.
+    profit_target : float, optional
+        Target profit level. Default is None, which means it is not
+        calculated.
+    loss_limit : float, optional
+        Limit loss level. Default is None, which means it is not calculated.
+    opt_commission : float
+        Broker commission for options transactions. Default is 0.0.
+    stock_commission : float
+        Broker commission for stocks transactions. Default is 0.0.
+    compute_expectation : logical, optional
+        Whether or not the strategy's average profit and loss must be
+        computed from a numpy array of random terminal prices generated from
+        the chosen distribution. Default is False.
+    use_dates : logical, optional
+        Whether the target and maturity dates are provided or not. If False,
+        the number of days remaining to the target date and maturity are
+        provided. Default is True.
+    discard_nonbusinessdays : logical, optional
+        Whether to discard Saturdays and Sundays (and maybe holidays) when
+        counting the number of days between two dates. Default is True.
+    country : string, optional
+        Country for which the holidays will be considered if 'discard_nonbusinessdyas'
+        is True. Default is 'US'.
+    start_date : string, optional
+        Start date in the calculations, in 'YYYY-MM-DD' format. Default is "".
+        Mandatory if 'use_dates' is True.
+    target_date : string, optional
+        Target date in the calculations, in 'YYYY-MM-DD' format. Default is "".
+        Mandatory if 'use_dates' is True.
+    days_to_target_date : int, optional
+        Number of days remaining until the target date. Not considered if
+        'use_dates' is True. Default is 30 days.
+    distribution : string, optional
+        Statistical distribution used to compute probabilities. It can be
+        'black-scholes', 'normal', 'laplace' or 'array'. Default is 'black-scholes'.
+    nmc_prices : int, optional
+        Number of random terminal prices to be generated when calculationg
+        the average profit and loss of a strategy. Default is 100,000.
     """
 
-    stockprice: float = Field(gt=0)
+    stock_price: float = Field(gt=0)
     volatility: float
-    interestrate: float = Field(gt=0, le=0.2)
-    minstock: float
-    maxstock: float
+    interest_rate: float = Field(gt=0, le=0.2)
+    min_stock: float
+    max_stock: float
     strategy: list[Strategy] = Field(..., discriminator="type")
-    dividendyield: float = 0.0
-    profittarg: float | None = None
-    losslimit: float | None = None
-    optcommission: float = 0.0
-    stockcommission: float = 0.0
+    dividend_yield: float = 0.0
+    profit_target: float | None = None
+    loss_limit: float | None = None
+    opt_commission: float = 0.0
+    stock_commission: float = 0.0
     compute_expectation: bool = False
     use_dates: bool = True
-    discard_nonbusinessdays: bool = True
+    discard_nonbusiness_days: bool = True
     country: Country = "US"
-    startdate: str = ""
-    targetdate: str = ""
-    days2targetdate: int = 30
+    start_date: str = ""
+    target_date: str = ""
+    days_to_target_date: int = 30
     distribution: Literal["black-scholes", "normal", "laplace", "array"] = (
         "black-scholes"
     )
-    nmcprices: float = 100000
+    nmc_prices: float = 100000
 
 
 class BlackScholesInfo(BaseModel):
