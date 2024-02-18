@@ -6,14 +6,14 @@ def test_get_next_fridays_date():
     date = get_fridays_date()
 
     assert date.weekday() == 4
-    assert date > dt.datetime.now()
+    assert date > dt.date.today()
 
     date = get_fridays_date(weeks_until=1)
 
     assert date.weekday() == 4
-    assert date > dt.datetime.now() + dt.timedelta(days=7)
+    assert date > dt.date.today() + dt.timedelta(days=7)
 
     date = get_fridays_date(weeks_until=2)
 
     assert date.weekday() == 4
-    assert date > dt.datetime.now() + dt.timedelta(days=14)
+    assert date > dt.date.today() + dt.timedelta(days=14)
