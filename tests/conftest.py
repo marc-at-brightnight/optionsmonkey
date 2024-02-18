@@ -1,15 +1,15 @@
 import pytest
-
+import datetime as dt
 
 @pytest.fixture
 def nvidia():
     stockprice = 168.99
     return dict(
-        stockprice=stockprice,
+        stock_price=stockprice,
         volatility=0.483,
-        startdate="2023-01-16",
-        targetdate="2023-02-17",
-        interestrate=0.045,
-        minstock=stockprice - 100.0,
-        maxstock=stockprice + 100.0,
+        start_date=dt.date(2023, 1, 16),
+        target_date=dt.date(2023, 2, 17),
+        interest_rate=0.045,
+        min_stock=stockprice - 100.0,
+        max_stock=stockprice + 100.0,
     )

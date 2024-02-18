@@ -1,4 +1,4 @@
-from optionsmonkey.strategyengine import StrategyEngine
+from optionsmonkey.engine import StrategyEngine
 
 from optionsmonkey.models import Inputs, Outputs
 

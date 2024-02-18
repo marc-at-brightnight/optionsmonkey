@@ -1,5 +1,4 @@
-from __future__ import division
-from __future__ import print_function
+from __future__ import print_function, division
 
 from datetime import date, datetime
 
@@ -109,13 +108,10 @@ class StrategyEngine:
 
         self.__country = inputs.country
 
-        if inputs.use_dates:
-            startdatetmp = datetime.strptime(inputs.start_date, "%Y-%m-%d").date()
-            targetdatetmp = datetime.strptime(inputs.target_date, "%Y-%m-%d").date()
-
-            if targetdatetmp > startdatetmp:
-                self.__startdate = startdatetmp
-                self.__targetdate = targetdatetmp
+        if inputs.use_dates and inputs.start_date and inputs.target_date:
+            if inputs.target_date > inputs.start_date:
+                self.__startdate = inputs.start_date
+                self.__targetdate = inputs.target_date
 
                 if self.__discard_nonbusinessdays:
                     ndiscardeddays = getnonbusinessdays(

@@ -1,3 +1,4 @@
+import datetime as dt
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -30,15 +31,15 @@ class BaseStrategy(BaseModel):
 
 class StockStrategy(BaseStrategy):
     type: Literal["stock"]
-    n: int
+    n: int = Field(gt=0)
     premium: float | None = None
 
 
 class OptionStrategy(BaseStrategy):
     type: OptionType
-    strike: float
-    premium: float
-    n: int
+    strike: float = Field(gt=0)
+    premium: float = Field(gt=0)
+    n: int = Field(gt=0)
     expiration: str | int | None = None
 
 
@@ -168,8 +169,8 @@ class Inputs(BaseModel):
     use_dates: bool = True
     discard_nonbusiness_days: bool = True
     country: Country = "US"
-    start_date: str = ""
-    target_date: str = ""
+    start_date: dt.date = Field(default_factory=dt.date.today)
+    target_date: dt.date = Field(default_factory=dt.date.today)
     days_to_target_date: int = 30
     distribution: Literal["black-scholes", "normal", "laplace", "array"] = (
         "black-scholes"

@@ -1,19 +1,26 @@
+import datetime as dt
 from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
 from yfinance import Ticker
 
+
 @dataclass
 class OptionsChain:
     calls: pd.DataFrame
     puts: pd.DataFrame
-    underlying: dict[str, Any]
+    underlying: dict[str, Any]  # TODO: pydantic model
 
 
-def get_options_chain(ticker: str, expiration_date: str) -> OptionsChain:
+def get_options_chain(ticker: str, expiration_date: dt.date) -> OptionsChain:
     stock = Ticker(ticker)
-    return stock.option_chain(expiration_date)
+    res = stock.option_chain(expiration_date.strftime("%Y-%m-%d"))
+    return OptionsChain(
+        calls=res.calls,
+        puts=res.puts,
+        underlying=res.underlying,
+    )
 
 
 def get_stock_history(ticker: str, num_of_months: int) -> pd.DataFrame:
