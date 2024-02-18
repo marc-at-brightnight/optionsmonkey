@@ -7,7 +7,7 @@ runs:
     - name: Cache virtual environment
       uses: actions/cache@v2
       env:
-        cache-name: cache-venv-6
+        cache-name: cache-venv-1
       with:
         path: '**/venv'
         key: ${{ runner.os }}-${{ env.cache-name }}-${{ hashFiles('poetry.lock') }}

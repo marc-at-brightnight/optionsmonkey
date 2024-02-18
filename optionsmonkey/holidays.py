@@ -7,6 +7,7 @@ December 31, 2050 for the following countries:
 
 from optionsmonkey.models import Country
 
+# TODO: convert to JSON
 
 def getholidays(country: Country):
     if country == "US":

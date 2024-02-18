@@ -1,12 +1,13 @@
-from __future__ import print_function
-from __future__ import division
-from numpy import array, ndarray, zeros, full, stack, savetxt
-import json
-from matplotlib import rcParams
-import matplotlib.pyplot as plt
+from __future__ import print_function, division
+
 from datetime import date, datetime
+
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+from numpy import array, ndarray, zeros, full, stack, savetxt
+
 from optionsmonkey.black_scholes import get_bs_info, get_implied_vol
-from optionsmonkey.models import Inputs, StockStrategy, Strategy, Outputs
+from optionsmonkey.models import Inputs, Strategy, Outputs
 from optionsmonkey.support import (
     getPLprofile,
     getPLprofilestock,
@@ -98,7 +99,7 @@ class StrategyEngine:
         self.__days2maturity = []
         self.__usebs = []
 
-        self.__discard_nonbusinessdays = inputs.discard_nonbusinessdays
+        self.__discard_nonbusinessdays = inputs.discard_nonbusiness_days
 
         if self.__discard_nonbusinessdays:
             self.__daysinyear = 252
@@ -107,13 +108,10 @@ class StrategyEngine:
 
         self.__country = inputs.country
 
-        if inputs.use_dates:
-            startdatetmp = datetime.strptime(inputs.startdate, "%Y-%m-%d").date()
-            targetdatetmp = datetime.strptime(inputs.targetdate, "%Y-%m-%d").date()
-
-            if targetdatetmp > startdatetmp:
-                self.__startdate = startdatetmp
-                self.__targetdate = targetdatetmp
+        if inputs.use_dates and inputs.start_date and inputs.target_date:
+            if inputs.target_date > inputs.start_date:
+                self.__startdate = inputs.start_date
+                self.__targetdate = inputs.target_date
 
                 if self.__discard_nonbusinessdays:
                     ndiscardeddays = getnonbusinessdays(
@@ -128,7 +126,7 @@ class StrategyEngine:
             else:
                 raise ValueError("Start date cannot be after the target date!")
         else:
-            self.__days2target = inputs.days2targetdate
+            self.__days2target = inputs.days_to_target_date
 
         for i, strat in enumerate(inputs.strategy):
             strategy: Strategy = strat
@@ -213,17 +211,17 @@ class StrategyEngine:
                 raise ValueError("Type must be 'call', 'put', 'stock' or 'closed'!")
 
         self.__distribution = inputs.distribution
-        self.__stockprice = inputs.stockprice
+        self.__stockprice = inputs.stock_price
         self.__volatility = inputs.volatility
-        self.__r = inputs.interestrate
-        self.__y = inputs.dividendyield
-        self.__minstock = inputs.minstock
-        self.__maxstock = inputs.maxstock
-        self.__profittarg = inputs.profittarg
-        self.__losslimit = inputs.losslimit
-        self.__optcommission = inputs.optcommission
-        self.__stockcommission = inputs.stockcommission
-        self.__nmcprices = inputs.nmcprices
+        self.__r = inputs.interest_rate
+        self.__y = inputs.dividend_yield
+        self.__minstock = inputs.min_stock
+        self.__maxstock = inputs.max_stock
+        self.__profittarg = inputs.profit_target
+        self.__losslimit = inputs.loss_limit
+        self.__optcommission = inputs.opt_commission
+        self.__stockcommission = inputs.stock_commission
+        self.__nmcprices = inputs.nmc_prices
         self.__compute_expectation = inputs.compute_expectation
         self.__use_dates = inputs.use_dates
 
