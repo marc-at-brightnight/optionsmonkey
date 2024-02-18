@@ -13,7 +13,7 @@ matplotlib = "^3.8.2"
 pydantic = "^2.5.3"
 polygon-api-client = "^1.13.4"
 yfinance = "^0.2.36"
-pymysql = "^1.1.0"
+psycopg2-binary = "^2.9.9"
 
 
 [tool.poetry.group.dev.dependencies]
