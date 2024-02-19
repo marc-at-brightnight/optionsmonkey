@@ -1,16 +1,9 @@
 import datetime as dt
-from dataclasses import dataclass
-from typing import Any
 
 import pandas as pd
 from yfinance import Ticker
 
-
-@dataclass
-class OptionsChain:
-    calls: pd.DataFrame
-    puts: pd.DataFrame
-    underlying: dict[str, Any]  # TODO: pydantic model
+from optionsmonkey.models import OptionsChain
 
 
 def get_options_chain(ticker: str, expiration_date: dt.date) -> OptionsChain:

@@ -148,7 +148,7 @@ For options, the dictionary should contain up to 7 keys:
   
     Either "buy" or "sell". It is mandatory.
   
-- "prevpos" : float
+- "prev_pos" : float
   
     Premium effectively paid or received in a previously opened position. If positive, it means that the position remains open and the payoff calculation takes this price into account, not the current price of the option. If negative, it means that the position is closed and the difference between this price and the current price is considered in the payoff calculation.
 
@@ -174,7 +174,7 @@ For stocks, the dictionary should contain up to 4 keys:
   
     Either "buy" or "sell". It is mandatory.
   
-- "prevpos" : float
+- "prev_pos" : float
   
     Stock price effectively paid or received in a previously opened position. If positive, it means that the position remains open and the payoff calculation takes this price into account, not thecurrent price of the stock. If negative, it means that the position is closed and the difference between this price and the current price is considered in the payoff calculation.
 
@@ -188,7 +188,7 @@ For a non-determined previously opened position to be closed, which might consis
   
     It must be "closed". It is mandatory.
   
-- "prevpos" : float
+- "prev_pos" : float
   
     The total value of the position to be closed, which can be positive if it made a profit or negative if it is a loss. It is mandatory.
 

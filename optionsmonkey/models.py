@@ -1,7 +1,9 @@
 import datetime as dt
-from typing import Literal
+from typing import Literal, Any
 
-from pydantic import BaseModel, Field
+import pandas as pd
+from humps import decamelize
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 OptionType = Literal["call", "put"]
 Range = tuple[float, float]
@@ -26,26 +28,75 @@ Country = Literal[
 
 class BaseStrategy(BaseModel):
     action: Literal["buy", "sell"]
-    prevpos: float | None = None
+    prev_pos: float | None = None
 
 
 class StockStrategy(BaseStrategy):
-    type: Literal["stock"]
+    """
+    "type" : string
+        It must be 'stock'. It is mandatory.
+    "n" : int
+        Number of shares. It is mandatory.
+    "action" : string
+        Either 'buy' or 'sell'. It is mandatory.
+    "prev_pos" : float
+        Stock price effectively paid or received in a previously
+        opened position. If positive, it means that the position
+        remains open and the payoff calculation takes this price
+        into account, not the current price of the stock. If
+        negative, it means that the position is closed and the
+        difference between this price and the current price is
+        considered in the payoff calculation.
+    """
+
+    type: Literal["stock"] = "stock"
     n: int = Field(gt=0)
     premium: float | None = None
 
 
 class OptionStrategy(BaseStrategy):
+    """
+    "type" : string
+        Either 'call' or 'put'. It is mandatory.
+    "strike" : float
+        Option strike price. It is mandatory.
+    "premium" : float
+        Option premium. It is mandatory.
+    "n" : int
+        Number of options. It is mandatory
+    "action" : string
+        Either 'buy' or 'sell'. It is mandatory.
+    "prev_pos" : float
+        Premium effectively paid or received in a previously opened
+        position. If positive, it means that the position remains
+        open and the payoff calculation takes this price into
+        account, not the current price of the option. If negative,
+        it means that the position is closed and the difference
+        between this price and the current price is considered in
+        the payoff calculation.
+    "expiration" : string | int
+        Expiration date.
+    """
+
     type: OptionType
     strike: float = Field(gt=0)
     premium: float = Field(gt=0)
     n: int = Field(gt=0)
-    expiration: str | int | None = None
+    expiration: dt.date
 
 
 class ClosedPosition(BaseModel):
-    type: Literal["closed"]
-    prevpos: float
+    """
+    "type" : string
+        It must be 'closed'. It is mandatory.
+    "prev_pos" : float
+        The total value of the position to be closed, which can be
+        positive if it made a profit or negative if it is a loss.
+        It is mandatory.
+    """
+
+    type: Literal["closed"] = "closed"
+    prev_pos: float
 
 
 Strategy = StockStrategy | OptionStrategy | ClosedPosition
@@ -64,54 +115,7 @@ class Inputs(BaseModel):
     max_stock : float
         Maximum value of the stock in the stock price domain.
     strategy : list
-        A Python list containing the strategy legs as Python dictionaries.
-        For options, the dictionary should contain up to 7 keys:
-            "type" : string
-                Either 'call' or 'put'. It is mandatory.
-            "strike" : float
-                Option strike price. It is mandatory.
-            "premium" : float
-                Option premium. It is mandatory.
-            "n" : int
-                Number of options. It is mandatory
-            "action" : string
-                Either 'buy' or 'sell'. It is mandatory.
-            "prevpos" : float
-                Premium effectively paid or received in a previously opened
-                position. If positive, it means that the position remains
-                open and the payoff calculation takes this price into
-                account, not the current price of the option. If negative,
-                it means that the position is closed and the difference
-                between this price and the current price is considered in
-                the payoff calculation.
-            "expiration" : string | int
-                Expiration date in 'YYYY-MM-DD' format or number of days
-                left before maturity, depending on the value in 'use_dates'
-                (see below).
-        For stocks, the dictionary should contain up to 4 keys:
-            "type" : string
-                It must be 'stock'. It is mandatory.
-            "n" : int
-                Number of shares. It is mandatory.
-            "action" : string
-                Either 'buy' or 'sell'. It is mandatory.
-            "prevpos" : float
-                Stock price effectively paid or received in a previously
-                opened position. If positive, it means that the position
-                remains open and the payoff calculation takes this price
-                into account, not the current price of the stock. If
-                negative, it means that the position is closed and the
-                difference between this price and the current price is
-                considered in the payoff calculation.
-        For a non-determined previously opened position to be closed, which
-        might consist of any combination of calls, puts and stocks, the
-        dictionary must contain two keys:
-            "type" : string
-                It must be 'closed'. It is mandatory.
-            "prevpos" : float
-                The total value of the position to be closed, which can be
-                positive if it made a profit or negative if it is a loss.
-                It is mandatory.
+        A list of `Strategy`
     dividend_yield : float, optional
         Annualized dividend yield. Default is 0.0.
     profit_target : float, optional
@@ -127,25 +131,16 @@ class Inputs(BaseModel):
         Whether or not the strategy's average profit and loss must be
         computed from a numpy array of random terminal prices generated from
         the chosen distribution. Default is False.
-    use_dates : logical, optional
-        Whether the target and maturity dates are provided or not. If False,
-        the number of days remaining to the target date and maturity are
-        provided. Default is True.
     discard_nonbusinessdays : logical, optional
         Whether to discard Saturdays and Sundays (and maybe holidays) when
         counting the number of days between two dates. Default is True.
     country : string, optional
         Country for which the holidays will be considered if 'discard_nonbusinessdyas'
         is True. Default is 'US'.
-    start_date : string, optional
-        Start date in the calculations, in 'YYYY-MM-DD' format. Default is "".
-        Mandatory if 'use_dates' is True.
-    target_date : string, optional
-        Target date in the calculations, in 'YYYY-MM-DD' format. Default is "".
-        Mandatory if 'use_dates' is True.
-    days_to_target_date : int, optional
-        Number of days remaining until the target date. Not considered if
-        'use_dates' is True. Default is 30 days.
+    start_date : dt.date, optional
+        Start date in the calculations (today if not provided).
+    target_date : dt.date, optional
+        Start date in the calculations (today if not provided).
     distribution : string, optional
         Statistical distribution used to compute probabilities. It can be
         'black-scholes', 'normal', 'laplace' or 'array'. Default is 'black-scholes'.
@@ -171,7 +166,6 @@ class Inputs(BaseModel):
     country: Country = "US"
     start_date: dt.date = Field(default_factory=dt.date.today)
     target_date: dt.date = Field(default_factory=dt.date.today)
-    days_to_target_date: int = 30
     distribution: Literal["black-scholes", "normal", "laplace", "array"] = (
         "black-scholes"
     )
@@ -189,6 +183,111 @@ class BlackScholesInfo(BaseModel):
     vega: float
     call_itm_prob: float
     put_itm_prob: float
+
+
+class UnderlyingAsset(BaseModel):
+    symbol: str
+    region: str
+    quote_type: Literal["EQUITY"]
+    quote_source_name: Literal["Delayed Quote"]
+    triggerable: bool
+    currency: Literal["USD"]
+    market_state: Literal["CLOSED", "OPEN"]
+    regular_market_change_percent: float
+    regular_market_price: float
+    exchange: str
+    short_name: str
+    long_name: str
+    exchange_timezone_name: str
+    exchange_timezone_short_name: str
+    gmt_off_set_milliseconds: int
+    market: Literal["us_market"]
+    esg_populated: bool
+    first_trade_date_milliseconds: int
+    post_market_change_percent: float
+    post_market_time: int
+    post_market_price: float
+    post_market_change: float
+    regular_market_change: float
+    regular_market_time: int
+    regular_market_day_high: float
+    regular_market_day_range: tuple[float, float]
+    regular_market_day_low: float
+    regular_market_volume: float
+    regular_market_previous_close: float
+    bid: float
+    ask: float
+    bid_size: int
+    ask_size: int
+    full_exchange_name: str
+    financial_currency: Literal["USD"]
+    regular_market_open: float
+    average_daily_volume3_month: int
+    average_daily_volume10_day: int
+    fifty_two_week_low_change: float
+    fifty_two_week_low_change_percent: float
+    fifty_two_week_range: tuple[float, float]
+    fifty_two_week_high_change: float
+    fifty_two_week_high_change_percent: float
+    fifty_two_week_low: float
+    fifty_two_week_high: float
+    fifty_two_week_change_percent: float
+    dividend_date: int
+    earnings_timestamp: int
+    earnings_timestamp_start: int
+    earnings_timestamp_end: int
+    trailing_annual_dividend_rate: float
+    trailing_pe: float
+    dividend_rate: float
+    trailing_annual_dividend_yield: float
+    dividend_yield: float
+    eps_trailing_twelve_months: float
+    eps_forward: float
+    eps_current_year: float
+    price_eps_current_year: float
+    shares_outstanding: int
+    book_value: float
+    fifty_day_average: float
+    fifty_day_average_change: float
+    fifty_day_average_change_percent: float
+    two_hundred_day_average: float
+    two_hundred_day_average_change: float
+    two_hundred_day_average_change_percent: float
+    market_cap: int
+    forward_pe: float
+    price_to_book: float
+    source_interval: int
+    exchange_data_delayed_by: int
+    average_analyst_rating: str
+    tradeable: bool
+    crypto_tradeable: bool
+    display_name: str
+
+
+class OptionsChain(BaseModel):
+    calls: pd.DataFrame
+    puts: pd.DataFrame
+    underlying: UnderlyingAsset
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator("underlying", mode="before")
+    @classmethod
+    def validate_underlying(cls, v: dict[str, Any]) -> UnderlyingAsset:
+        day_range_split = v["regularMarketDayRange"].split(" - ")
+        fifty_two_week_range_split = v["fiftyTwoWeekRange"].split(" - ")
+        return UnderlyingAsset.model_validate(
+            decamelize(v)
+            | {
+                "regular_market_day_range": (
+                    float(day_range_split[0]),
+                    float(day_range_split[1]),
+                ),
+                "fifty_two_week_range": (
+                    float(fifty_two_week_range_split[0]),
+                    float(fifty_two_week_range_split[1]),
+                ),
+            }
+        )
 
 
 class Outputs(BaseModel):

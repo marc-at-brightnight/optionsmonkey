@@ -1,13 +1,9 @@
 from __future__ import print_function, division
 
-from datetime import date, datetime
-
-import matplotlib.pyplot as plt
-from matplotlib import rcParams
-from numpy import array, ndarray, zeros, full, stack, savetxt
+from numpy import array, zeros
 
 from optionsmonkey.black_scholes import get_bs_info, get_implied_vol
-from optionsmonkey.models import Inputs, Strategy, Outputs
+from optionsmonkey.models import Inputs, Strategy, Outputs, OptionStrategy
 from optionsmonkey.support import (
     getPLprofile,
     getPLprofilestock,
@@ -21,60 +17,7 @@ from optionsmonkey.support import (
 
 
 class StrategyEngine:
-    def __init__(self):
-        """
-        __init__ -> initializes class variables.
-
-        Returns
-        -------
-        None.
-        """
-        self.__s = array([])
-        self.__s_mc = array([])
-        self.__strike = []
-        self.__premium = []
-        self.__n = []
-        self.__action = []
-        self.__type = []
-        self.__expiration = []
-        self.__prevpos = []
-        self.__usebs = []
-        self.__profitranges = []
-        self.__profittargrange = []
-        self.__losslimitranges = []
-        self.__days2maturity = []
-        self.__stockprice = None
-        self.__volatility = None
-        self.__startdate = date.today()
-        self.__targetdate = self.__startdate
-        self.__r = None
-        self.__y = 0.0
-        self.__profittarg = None
-        self.__losslimit = None
-        self.__optcommission = 0.0
-        self.__stockcommission = 0.0
-        self.__minstock = None
-        self.__maxstock = None
-        self.__distribution = "black-scholes"
-        self.__country = "US"
-        self.__days2target = 30
-        self.__nmcprices = 100000
-        self.__compute_expectation = False
-        self.__use_dates = True
-        self.__discard_nonbusinessdays = True
-        self.__daysinyear = 252
-        self.impvol = []
-        self.itmprob = []
-        self.delta = []
-        self.gamma = []
-        self.vega = []
-        self.theta = []
-        self.cost = []
-        self.profitprob = 0.0
-        self.profittargprob = 0.0
-        self.losslimitprob = 0.0
-
-    def getdata(self, inputs: Inputs):
+    def __init__(self, inputs: Inputs):
         """
         getdata -> provides input data to performs calculations for a strategy.
 
@@ -89,141 +32,145 @@ class StrategyEngine:
         if len(inputs.strategy) == 0:
             raise ValueError("No strategy provided!")
 
-        self.__type = []
-        self.__strike = []
-        self.__premium = []
-        self.__n = []
-        self.__action = []
-        self.__prevpos = []
-        self.__expiration = []
-        self.__days2maturity = []
-        self.__usebs = []
+        self.s = array([])
+        self.s_mc = array([])
+        self.strike = []
+        self.premium = []
+        self.n = []
+        self.action: list[str] = []
+        self.type = []
+        self.expiration = []
+        self.prev_pos = []
+        self.use_bs = []
+        self.profit_ranges: list[float] = []
+        self.profit_target_range: list[float] = []
+        self.loss_limit_ranges: list[float] = []
+        self.days_to_maturity: list[float] = []
+        self.stock_price = None
+        self.volatility = None
+        self.start_date = inputs.start_date
+        self.r = None
+        self.y = 0.0
+        self.profit_target = None
+        self.loss_limit = None
+        self.opt_commission = 0.0
+        self.stock_commission = 0.0
+        self.min_stock = None
+        self.max_stock = None
+        self.distribution = "black-scholes"
+        self.country = "US"
+        self.days_to_target = 30
+        self.nmc_prices = 100e3
+        self.compute_expectation = False
+        self.discard_nonbusinessdays = True
+        self.days_in_year = 252
+        self.impvol: list[float] = []
+        self.itmprob: list[float] = []
+        self.delta: list[float] = []
+        self.gamma: list[float] = []
+        self.vega: list[float] = []
+        self.theta: list[float] = []
+        self.cost: list[float] = []
+        self.profitprob = 0.0
+        self.profittargprob = 0.0
+        self.losslimitprob = 0.0
 
-        self.__discard_nonbusinessdays = inputs.discard_nonbusiness_days
+        self.discard_nonbusinessdays = inputs.discard_nonbusiness_days
 
-        if self.__discard_nonbusinessdays:
-            self.__daysinyear = 252
+        if self.discard_nonbusinessdays:
+            self.days_in_year = 252
         else:
-            self.__daysinyear = 365
+            self.days_in_year = 365
 
-        self.__country = inputs.country
+        self.country = inputs.country
 
-        if inputs.use_dates and inputs.start_date and inputs.target_date:
-            if inputs.target_date > inputs.start_date:
-                self.__startdate = inputs.start_date
-                self.__targetdate = inputs.target_date
+        if inputs.target_date > inputs.start_date:
+            self.start_date = inputs.start_date
+            self.target_date = inputs.target_date
 
-                if self.__discard_nonbusinessdays:
-                    ndiscardeddays = getnonbusinessdays(
-                        self.__startdate, self.__targetdate, self.__country
-                    )
-                else:
-                    ndiscardeddays = 0
-
-                self.__days2target = (
-                    self.__targetdate - self.__startdate
-                ).days - ndiscardeddays
+            if self.discard_nonbusinessdays:
+                ndiscardeddays = getnonbusinessdays(
+                    self.start_date, self.target_date, self.country
+                )
             else:
-                raise ValueError("Start date cannot be after the target date!")
+                ndiscardeddays = 0
+
+            self.days_to_target = (
+                self.target_date - self.start_date
+            ).days - ndiscardeddays
         else:
-            self.__days2target = inputs.days_to_target_date
+            raise ValueError(
+                "Start date cannot be after the target date!"
+            )  # TODO: move validation to pydantic
 
         for i, strat in enumerate(inputs.strategy):
             strategy: Strategy = strat
-            self.__type.append(strategy.type)
+            self.type.append(strategy.type)
 
-            if strategy.type in ("call", "put"):
-                self.__strike.append(strategy.strike)  # type: ignore
-                self.__premium.append(strategy.premium)  # type: ignore
-                self.__n.append(strategy.n)  # type: ignore
-                self.__action.append(strategy.action)  # type: ignore
-                self.__prevpos.append(strategy.prevpos or 0.0)
+            if type(strategy) is OptionStrategy:
+                self.strike.append(strategy.strike)  # type: ignore
+                self.premium.append(strategy.premium)  # type: ignore
+                self.n.append(strategy.n)  # type: ignore
+                self.action.append(strategy.action)  # type: ignore
+                self.prev_pos.append(strategy.prev_pos or 0.0)
 
-                if strategy.expiration:  # type: ignore
-                    if inputs.use_dates:
-                        expirationtmp = datetime.strptime(
-                            strategy.expiration, "%Y-%m-%d"  # type: ignore
-                        ).date()
+                if strategy.expiration >= self.target_date:
+                    self.expiration.append(strategy.expiration)
+
+                    if self.discard_nonbusinessdays:
+                        ndiscardeddays = getnonbusinessdays(
+                            self.start_date, strategy.expiration, self.country
+                        )
                     else:
-                        days2maturitytmp = strategy.expiration  # type: ignore
+                        ndiscardeddays = 0
+
+                    self.days_to_maturity.append(
+                        (strategy.expiration - self.start_date).days - ndiscardeddays
+                    )
+
+                    self.use_bs.append(strategy.expiration != self.target_date)
                 else:
-                    if inputs.use_dates:
-                        expirationtmp = self.__targetdate
-                    else:
-                        days2maturitytmp = self.__days2target
+                    raise ValueError(
+                        "Expiration date must be after or equal to the target date!"
+                    )
 
-                if inputs.use_dates:
-                    if expirationtmp >= self.__targetdate:  # FIXME
-                        self.__expiration.append(expirationtmp)
-
-                        if self.__discard_nonbusinessdays:
-                            ndiscardeddays = getnonbusinessdays(
-                                self.__startdate, expirationtmp, self.__country
-                            )
-                        else:
-                            ndiscardeddays = 0
-
-                        self.__days2maturity.append(
-                            (expirationtmp - self.__startdate).days - ndiscardeddays
-                        )
-
-                        if expirationtmp == self.__targetdate:
-                            self.__usebs.append(False)
-                        else:
-                            self.__usebs.append(True)
-                    else:
-                        raise ValueError(
-                            "Expiration date must be after or equal to the target date!"
-                        )
-                else:
-                    if days2maturitytmp >= self.__days2target:  # FIXME
-                        self.__days2maturity.append(days2maturitytmp)
-
-                        if days2maturitytmp == self.__days2target:
-                            self.__usebs.append(False)
-                        else:
-                            self.__usebs.append(True)
-                    else:
-                        raise ValueError(
-                            "Days remaining to maturity must be greater than or equal to the number of days remaining to the target date!"
-                        )
             elif strategy.type == "stock":
-                self.__n.append(strategy.n)
-                self.__action.append(strategy.action)
-                self.__prevpos.append(strategy.prevpos or 0.0)
+                self.n.append(strategy.n)
+                self.action.append(strategy.action)
+                self.prev_pos.append(strategy.prev_pos or 0.0)
 
-                self.__strike.append(0.0)
-                self.__premium.append(0.0)
-                self.__usebs.append(False)
-                self.__days2maturity.append(-1)
-                self.__expiration.append(self.__targetdate if inputs.use_dates else -1)
+                self.strike.append(0.0)
+                self.premium.append(0.0)
+                self.use_bs.append(False)
+                self.days_to_maturity.append(-1)
+                self.expiration.append(self.target_date)
 
             elif strategy.type == "closed":
-                self.__prevpos.append(strategy.prevpos)
-                self.__strike.append(0.0)
-                self.__n.append(0)
-                self.__premium.append(0.0)
-                self.__action.append("n/a")
-                self.__usebs.append(False)
-                self.__days2maturity.append(-1)
-                self.__expiration.append(self.__targetdate if inputs.use_dates else -1)
+                self.prev_pos.append(strategy.prev_pos)
+                self.strike.append(0.0)
+                self.n.append(0)
+                self.premium.append(0.0)
+                self.action.append("n/a")
+                self.use_bs.append(False)
+                self.days_to_maturity.append(-1)
+                self.expiration.append(self.target_date)
             else:
                 raise ValueError("Type must be 'call', 'put', 'stock' or 'closed'!")
 
-        self.__distribution = inputs.distribution
-        self.__stockprice = inputs.stock_price
-        self.__volatility = inputs.volatility
-        self.__r = inputs.interest_rate
-        self.__y = inputs.dividend_yield
-        self.__minstock = inputs.min_stock
-        self.__maxstock = inputs.max_stock
-        self.__profittarg = inputs.profit_target
-        self.__losslimit = inputs.loss_limit
-        self.__optcommission = inputs.opt_commission
-        self.__stockcommission = inputs.stock_commission
-        self.__nmcprices = inputs.nmc_prices
-        self.__compute_expectation = inputs.compute_expectation
-        self.__use_dates = inputs.use_dates
+        self.distribution = inputs.distribution
+        self.stock_price = inputs.stock_price
+        self.volatility = inputs.volatility
+        self.r = inputs.interest_rate
+        self.y = inputs.dividend_yield
+        self.min_stock = inputs.min_stock
+        self.max_stock = inputs.max_stock
+        self.profit_target = inputs.profit_target
+        self.loss_limit = inputs.loss_limit
+        self.opt_commission = inputs.opt_commission
+        self.stock_commission = inputs.stock_commission
+        self.nmc_prices = inputs.nmc_prices
+        self.compute_expectation = inputs.compute_expectation
+        self.use_dates = inputs.use_dates
 
     def run(self):
         """
@@ -233,17 +180,17 @@ class StrategyEngine:
         -------
         outputs : Outputs
         """
-        if len(self.__type) == 0:
+        if len(self.type) == 0:
             raise RuntimeError("No legs in the strategy! Nothing to do!")
-        elif self.__type.count("closed") > 1:
+        elif self.type.count("closed") > 1:
             raise RuntimeError("Only one position of type 'closed' is allowed!")
-        elif self.__distribution == "array" and self.__s_mc.shape[0] == 0:
+        elif self.distribution == "array" and self.s_mc.shape[0] == 0:
             raise RuntimeError(
                 "No terminal stock prices from Monte Carlo simulations! Nothing to do!"
             )
 
-        time2target = self.__days2target / self.__daysinyear
-        self.cost = [0.0 for _ in range(len(self.__type))]
+        time2target = self.days_to_target / self.days_in_year
+        self.cost = [0.0 for _ in range(len(self.type))]
         self.impvol = []
         self.itmprob = []
         self.delta = []
@@ -251,38 +198,38 @@ class StrategyEngine:
         self.vega = []
         self.theta = []
 
-        if self.__s.shape[0] == 0:
-            self.__s = createpriceseq(self.__minstock, self.__maxstock)
+        if self.s.shape[0] == 0:
+            self.s = createpriceseq(self.min_stock, self.max_stock)
 
-        self.profit = zeros((len(self.__type), self.__s.shape[0]))
-        self.strategyprofit = zeros(self.__s.shape[0])
+        self.profit = zeros((len(self.type), self.s.shape[0]))
+        self.strategyprofit = zeros(self.s.shape[0])
 
-        if self.__compute_expectation and self.__s_mc.shape[0] == 0:
-            self.__s_mc = createpricesamples(
-                self.__stockprice,
-                self.__volatility,
+        if self.compute_expectation and self.s_mc.shape[0] == 0:
+            self.s_mc = createpricesamples(
+                self.stock_price,
+                self.volatility,
                 time2target,
-                self.__r,
-                self.__distribution,
-                self.__y,
-                self.__nmcprices,
+                self.r,
+                self.distribution,
+                self.y,
+                self.nmc_prices,
             )
 
-        if self.__s_mc.shape[0] > 0:
-            self.profit_mc = zeros((len(self.__type), self.__s_mc.shape[0]))
-            self.strategyprofit_mc = zeros(self.__s_mc.shape[0])
+        if self.s_mc.shape[0] > 0:
+            self.profit_mc = zeros((len(self.type), self.s_mc.shape[0]))
+            self.strategyprofit_mc = zeros(self.s_mc.shape[0])
 
-        for i, type in enumerate(self.__type):
+        for i, type in enumerate(self.type):
             if type in ("call", "put"):
-                if self.__prevpos[i] >= 0.0:
-                    time2maturity = self.__days2maturity[i] / self.__daysinyear
+                if self.prev_pos[i] >= 0.0:
+                    time2maturity = self.days_to_maturity[i] / self.days_in_year
                     bs = get_bs_info(
-                        self.__stockprice,
-                        self.__strike[i],
-                        self.__r,
-                        self.__volatility,
+                        self.stock_price,
+                        self.strike[i],
+                        self.r,
+                        self.volatility,
                         time2maturity,
-                        self.__y,
+                        self.y,
                     )
 
                     self.gamma.append(bs.gamma)
@@ -292,42 +239,42 @@ class StrategyEngine:
                         self.impvol.append(
                             get_implied_vol(
                                 "call",
-                                self.__premium[i],
-                                self.__stockprice,
-                                self.__strike[i],
-                                self.__r,
+                                self.premium[i],
+                                self.stock_price,
+                                self.strike[i],
+                                self.r,
                                 time2maturity,
-                                self.__y,
+                                self.y,
                             )
                         )
                         self.itmprob.append(bs.call_itm_prob)
 
-                        if self.__action[i] == "buy":
+                        if self.action[i] == "buy":
                             self.delta.append(bs.call_delta)
-                            self.theta.append(bs.call_theta / self.__daysinyear)
+                            self.theta.append(bs.call_theta / self.days_in_year)
                         else:
                             self.delta.append(-bs.call_delta)
-                            self.theta.append(-bs.call_theta / self.__daysinyear)
+                            self.theta.append(-bs.call_theta / self.days_in_year)
                     else:
                         self.impvol.append(
                             get_implied_vol(
                                 "put",
-                                self.__premium[i],
-                                self.__stockprice,
-                                self.__strike[i],
-                                self.__r,
+                                self.premium[i],
+                                self.stock_price,
+                                self.strike[i],
+                                self.r,
                                 time2maturity,
-                                self.__y,
+                                self.y,
                             )
                         )
                         self.itmprob.append(bs.putitmprob)
 
-                        if self.__action[i] == "buy":
+                        if self.action[i] == "buy":
                             self.delta.append(bs.put_delta)
-                            self.theta.append(bs.put_theta / self.__daysinyear)
+                            self.theta.append(bs.put_theta / self.days_in_year)
                         else:
                             self.delta.append(-bs.put_delta)
-                            self.theta.append(-bs.put_theta / self.__daysinyear)
+                            self.theta.append(-bs.put_theta / self.days_in_year)
                 else:
                     self.impvol.append(0.0)
                     self.itmprob.append(0.0)
@@ -336,74 +283,74 @@ class StrategyEngine:
                     self.vega.append(0.0)
                     self.theta.append(0.0)
 
-                if self.__prevpos[i] < 0.0:  # Previous position is closed
-                    costtmp = (self.__premium[i] + self.__prevpos[i]) * self.__n[i]
+                if self.prev_pos[i] < 0.0:  # Previous position is closed
+                    costtmp = (self.premium[i] + self.prev_pos[i]) * self.n[i]
 
-                    if self.__action[i] == "buy":
+                    if self.action[i] == "buy":
                         costtmp *= -1.0
 
                     self.cost[i] = costtmp
                     self.profit[i] += costtmp
 
-                    if self.__compute_expectation or self.__distribution == "array":
+                    if self.compute_expectation or self.distribution == "array":
                         self.profit_mc[i] += costtmp
                 else:
-                    if self.__prevpos[i] > 0.0:  # Premium of the open position
-                        opval = self.__prevpos[i]
+                    if self.prev_pos[i] > 0.0:  # Premium of the open position
+                        opval = self.prev_pos[i]
                     else:  # Current premium
-                        opval = self.__premium[i]
+                        opval = self.premium[i]
 
-                    if self.__usebs[i]:
+                    if self.use_bs[i]:
                         self.profit[i], self.cost[i] = getPLprofileBS(
                             type,
-                            self.__action[i],
-                            self.__strike[i],
+                            self.action[i],
+                            self.strike[i],
                             opval,
-                            self.__r,
-                            (self.__days2maturity[i] - self.__days2target)
-                            / self.__daysinyear,
-                            self.__volatility,
-                            self.__n[i],
-                            self.__s,
-                            self.__y,
-                            self.__optcommission,
+                            self.r,
+                            (self.days_to_maturity[i] - self.days_to_target)
+                            / self.days_in_year,
+                            self.volatility,
+                            self.n[i],
+                            self.s,
+                            self.y,
+                            self.opt_commission,
                         )
 
-                        if self.__compute_expectation or self.__distribution == "array":
+                        if self.compute_expectation or self.distribution == "array":
                             self.profit_mc[i] = getPLprofileBS(
                                 type,
-                                self.__action[i],
-                                self.__strike[i],
+                                self.action[i],
+                                self.strike[i],
                                 opval,
-                                self.__r,
-                                (self.__days2maturity[i] - self.__days2target)
-                                / self.__daysinyear,
-                                self.__volatility,
-                                self.__n[i],
-                                self.__s_mc,
-                                self.__y,
-                                self.__optcommission,
+                                self.r,
+                                (self.days_to_maturity[i] - self.days_to_target)
+                                / self.days_in_year,
+                                self.volatility,
+                                self.n[i],
+                                self.s_mc,
+                                self.y,
+                                self.opt_commission,
                             )[0]
                     else:
                         self.profit[i], self.cost[i] = getPLprofile(
                             type,
-                            self.__action[i],
-                            self.__strike[i],
+                            self.action[i],
+                            self.strike[i],
                             opval,
-                            self.__n[i],
-                            self.__s,
-                            self.__optcommission,
+                            self.n[i],
+                            self.s,
+                            self.opt_commission,
                         )
 
-                        if self.__compute_expectation or self.__distribution == "array":
+                        if self.compute_expectation or self.distribution == "array":
                             self.profit_mc[i] = getPLprofile(
                                 type,
-                                self.__action[i],
-                                self.__strike[i],
+                                self.action[i],
+                                self.strike[i],
                                 opval,
-                                self.__n[i],
-                                self.__s_mc,
-                                self.__optcommission,
+                                self.n[i],
+                                self.s_mc,
+                                self.opt_commission,
                             )[0]
             elif type == "stock":
                 self.impvol.append(0.0)
@@ -413,38 +360,38 @@ class StrategyEngine:
                 self.vega.append(0.0)
                 self.theta.append(0.0)
 
-                if self.__prevpos[i] < 0.0:  # Previous position is closed
-                    costtmp = (self.__stockprice + self.__prevpos[i]) * self.__n[i]
+                if self.prev_pos[i] < 0.0:  # Previous position is closed
+                    costtmp = (self.stock_price + self.prev_pos[i]) * self.n[i]
 
-                    if self.__action[i] == "buy":
+                    if self.action[i] == "buy":
                         costtmp *= -1.0
 
                     self.cost[i] = costtmp
                     self.profit[i] += costtmp
 
-                    if self.__compute_expectation or self.__distribution == "array":
+                    if self.compute_expectation or self.distribution == "array":
                         self.profit_mc[i] += costtmp
                 else:
-                    if self.__prevpos[i] > 0.0:  # Stock price at previous position
-                        stockpos = self.__prevpos[i]
+                    if self.prev_pos[i] > 0.0:  # Stock price at previous position
+                        stockpos = self.prev_pos[i]
                     else:  # Spot price of the stock at start date
-                        stockpos = self.__stockprice
+                        stockpos = self.stock_price
 
                     self.profit[i], self.cost[i] = getPLprofilestock(
                         stockpos,
-                        self.__action[i],
-                        self.__n[i],
-                        self.__s,
-                        self.__stockcommission,
+                        self.action[i],
+                        self.n[i],
+                        self.s,
+                        self.stock_commission,
                     )
 
-                    if self.__compute_expectation or self.__distribution == "array":
+                    if self.compute_expectation or self.distribution == "array":
                         self.profit_mc[i] = getPLprofilestock(
                             stockpos,
-                            self.__action[i],
-                            self.__n[i],
-                            self.__s_mc,
-                            self.__stockcommission,
+                            self.action[i],
+                            self.n[i],
+                            self.s_mc,
+                            self.stock_commission,
                         )[0]
             elif type == "closed":
                 self.impvol.append(0.0)
@@ -454,89 +401,89 @@ class StrategyEngine:
                 self.vega.append(0.0)
                 self.theta.append(0.0)
 
-                self.cost[i] = self.__prevpos[i]
-                self.profit[i] += self.__prevpos[i]
+                self.cost[i] = self.prev_pos[i]
+                self.profit[i] += self.prev_pos[i]
 
-                if self.__compute_expectation or self.__distribution == "array":
-                    self.profit_mc[i] += self.__prevpos[i]
+                if self.compute_expectation or self.distribution == "array":
+                    self.profit_mc[i] += self.prev_pos[i]
 
             self.strategyprofit += self.profit[i]
 
-            if self.__compute_expectation or self.__distribution == "array":
+            if self.compute_expectation or self.distribution == "array":
                 self.strategyprofit_mc += self.profit_mc[i]
 
-        self.__profitranges = getprofitrange(self.__s, self.strategyprofit)
+        self.profit_ranges = getprofitrange(self.s, self.strategyprofit)
 
-        if self.__profitranges:
-            if self.__distribution in ("normal", "laplace", "black-scholes"):
+        if self.profit_ranges:
+            if self.distribution in ("normal", "laplace", "black-scholes"):
                 self.profitprob = getPoP(
-                    self.__profitranges,
-                    self.__distribution,
-                    stockprice=self.__stockprice,
-                    volatility=self.__volatility,
+                    self.profit_ranges,
+                    self.distribution,
+                    stockprice=self.stock_price,
+                    volatility=self.volatility,
                     time2maturity=time2target,
-                    interestrate=self.__r,
-                    dividendyield=self.__y,
+                    interestrate=self.r,
+                    dividendyield=self.y,
                 )
-            elif self.__distribution == "array":
+            elif self.distribution == "array":
                 self.profitprob = getPoP(
-                    self.__profitranges, self.__distribution, array=self.__s_mc
+                    self.profit_ranges, self.distribution, array=self.s_mc
                 )
 
-        if self.__profittarg is not None:
-            self.__profittargrange = getprofitrange(
-                self.__s, self.strategyprofit, self.__profittarg
+        if self.profit_target is not None:
+            self.profit_target_range = getprofitrange(
+                self.s, self.strategyprofit, self.profit_target
             )
 
-            if self.__profittargrange:
-                if self.__distribution in ("normal", "laplace", "black-scholes"):
+            if self.profit_target_range:
+                if self.distribution in ("normal", "laplace", "black-scholes"):
                     self.profittargprob = getPoP(
-                        self.__profittargrange,
-                        self.__distribution,
-                        stockprice=self.__stockprice,
-                        volatility=self.__volatility,
+                        self.profit_target_range,
+                        self.distribution,
+                        stockprice=self.stock_price,
+                        volatility=self.volatility,
                         time2maturity=time2target,
-                        interestrate=self.__r,
-                        dividendyield=self.__y,
+                        interestrate=self.r,
+                        dividendyield=self.y,
                     )
-                elif self.__distribution == "array":
+                elif self.distribution == "array":
                     self.profittargprob = getPoP(
-                        self.__profittargrange, self.__distribution, array=self.__s_mc
+                        self.profit_target_range, self.distribution, array=self.s_mc
                     )
 
-        if self.__losslimit is not None:
-            self.__losslimitranges = getprofitrange(
-                self.__s, self.strategyprofit, self.__losslimit + 0.01
+        if self.loss_limit is not None:
+            self.loss_limit_ranges = getprofitrange(
+                self.s, self.strategyprofit, self.loss_limit + 0.01
             )
 
-            if self.__losslimitranges:
-                if self.__distribution in ("normal", "laplace", "black-scholes"):
+            if self.loss_limit_ranges:
+                if self.distribution in ("normal", "laplace", "black-scholes"):
                     self.losslimitprob = 1.0 - getPoP(
-                        self.__losslimitranges,
-                        self.__distribution,
-                        stockprice=self.__stockprice,
-                        volatility=self.__volatility,
+                        self.loss_limit_ranges,
+                        self.distribution,
+                        stockprice=self.stock_price,
+                        volatility=self.volatility,
                         time2maturity=time2target,
-                        interestrate=self.__r,
-                        dividendyield=self.__y,
+                        interestrate=self.r,
+                        dividendyield=self.y,
                     )
-                elif self.__distribution == "array":
+                elif self.distribution == "array":
                     self.losslimitprob = 1.0 - getPoP(
-                        self.__losslimitranges, self.__distribution, array=self.__s_mc
+                        self.loss_limit_ranges, self.distribution, array=self.s_mc
                     )
 
         opt_outputs = {}
 
-        if self.__profittarg is not None:
+        if self.profit_target is not None:
             opt_outputs["probability_of_profit_target"] = self.profittargprob
-            opt_outputs["project_target_ranges"] = self.__profittargrange
+            opt_outputs["project_target_ranges"] = self.profit_target_range
 
-        if self.__losslimit is not None:
+        if self.loss_limit is not None:
             opt_outputs["probability_of_loss_limit"] = self.losslimitprob
 
         if (
-            self.__compute_expectation or self.__distribution == "array"
-        ) and self.__s_mc.shape[0] > 0:
+            self.compute_expectation or self.distribution == "array"
+        ) and self.s_mc.shape[0] > 0:
             tmpprof = self.strategyprofit_mc[self.strategyprofit_mc >= 0.01]
             tmploss = self.strategyprofit_mc[self.strategyprofit_mc < 0.0]
             opt_outputs["average_profit_from_mc"] = (
@@ -556,7 +503,7 @@ class StrategyEngine:
                 "probability_of_profit": self.profitprob,
                 "strategy_cost": sum(self.cost),
                 "per_leg_cost": self.cost,
-                "profit_ranges": self.__profitranges,
+                "profit_ranges": self.profit_ranges,
                 "minimum_return_in_the_domain": self.strategyprofit.min(),
                 "maximum_return_in_the_domain": self.strategyprofit.max(),
                 "implied_volatility": self.impvol,
@@ -568,9 +515,9 @@ class StrategyEngine:
             }
         )
 
-    def getPL(self, leg=-1):
+    def get_pl(self, leg=-1):
         """
-        getPL -> returns the profit/loss profile of either a leg or the whole
+        get_pl -> returns the profit/loss profile of either a leg or the whole
         strategy.
 
         Parameters
@@ -586,197 +533,9 @@ class StrategyEngine:
             Profit/loss profile of either a leg or the whole strategy.
         """
         if self.profit.size > 0 and leg >= 0 and leg < self.profit.shape[0]:
-            return self.__s, self.profit[leg]
+            return self.s, self.profit[leg]
         else:
-            return self.__s, self.strategyprofit
-
-    def PL2csv(self, filename="pl.csv", leg=-1):
-        """
-        PL2csv -> saves the profit/loss data to a .csv file.
-
-        Parameters
-        ----------
-        filename : string, optional
-            Name of the .csv file. Default is 'pl.csv'.
-        leg : int, optional
-            Index of the leg. Default is -1 (whole strategy).
-
-        Returns
-        -------
-        None.
-        """
-        if self.profit.size > 0 and leg >= 0 and leg < self.profit.shape[0]:
-            arr = stack((self.__s, self.profit[leg]))
-        else:
-            arr = stack((self.__s, self.strategyprofit))
-
-        savetxt(
-            filename, arr.transpose(), delimiter=",", header="StockPrice,Profit/Loss"
-        )
-
-    def plotPL(self):
-        """
-        plotPL -> displays the strategy's profit/loss profile diagram.
-
-        Returns
-        -------
-        None.
-        """
-        if len(self.strategyprofit) == 0:
-            raise RuntimeError(
-                "Before plotting the profit/loss profile diagram, you must run a calculation!"
-            )
-
-        rcParams.update({"figure.autolayout": True})
-
-        zeroline = zeros(self.__s.shape[0])
-        strikecallbuy = []
-        strikeputbuy = []
-        zerocallbuy = []
-        zeroputbuy = []
-        strikecallsell = []
-        strikeputsell = []
-        zerocallsell = []
-        zeroputsell = []
-        comment = "P/L profile diagram:\n--------------------\n"
-        comment += "The vertical green dashed line corresponds to the position "
-        comment += "of the stock's spot price. The right and left arrow "
-        comment += "markers indicate the strike prices of calls and puts, "
-        comment += "respectively, with blue representing long and red representing "
-        comment += "short positions."
-
-        plt.axvline(self.__stockprice, ls="--", color="green")
-        plt.xlabel("Stock price")
-        plt.ylabel("Profit/Loss")
-        plt.xlim(self.__s.min(), self.__s.max())
-
-        for i in range(len(self.__strike)):
-            if self.__strike[i] > 0.0:
-                if self.__type[i] == "call":
-                    if self.__action[i] == "buy":
-                        strikecallbuy.append(self.__strike[i])
-                        zerocallbuy.append(0.0)
-                    elif self.__action[i] == "sell":
-                        strikecallsell.append(self.__strike[i])
-                        zerocallsell.append(0.0)
-                elif self.__type[i] == "put":
-                    if self.__action[i] == "buy":
-                        strikeputbuy.append(self.__strike[i])
-                        zeroputbuy.append(0.0)
-                    elif self.__action[i] == "sell":
-                        strikeputsell.append(self.__strike[i])
-                        zeroputsell.append(0.0)
-
-        if self.__profittarg is not None:
-            comment += " The blue dashed line represents the profit target level."
-            targetline = full(self.__s.shape[0], self.__profittarg)
-
-        if self.__losslimit is not None:
-            comment += " The red dashed line represents the loss limit level."
-            lossline = full(self.__s.shape[0], self.__losslimit)
-
-        print(comment)
-
-        if self.__losslimit is not None and self.__profittarg is not None:
-            plt.plot(
-                self.__s,
-                zeroline,
-                "m--",
-                self.__s,
-                lossline,
-                "r--",
-                self.__s,
-                targetline,
-                "b--",
-                self.__s,
-                self.strategyprofit,
-                "k-",
-                strikecallbuy,
-                zerocallbuy,
-                "b>",
-                strikeputbuy,
-                zeroputbuy,
-                "b<",
-                strikecallsell,
-                zerocallsell,
-                "r>",
-                strikeputsell,
-                zeroputsell,
-                "r<",
-                markersize=10,
-            )
-        elif self.__losslimit is not None:
-            plt.plot(
-                self.__s,
-                zeroline,
-                "m--",
-                self.__s,
-                lossline,
-                "r--",
-                self.__s,
-                self.strategyprofit,
-                "k-",
-                strikecallbuy,
-                zerocallbuy,
-                "b>",
-                strikeputbuy,
-                zeroputbuy,
-                "b<",
-                strikecallsell,
-                zerocallsell,
-                "r>",
-                strikeputsell,
-                zeroputsell,
-                "r<",
-                markersize=10,
-            )
-        elif self.__profittarg is not None:
-            plt.plot(
-                self.__s,
-                zeroline,
-                "m--",
-                self.__s,
-                targetline,
-                "b--",
-                self.__s,
-                self.strategyprofit,
-                "k-",
-                strikecallbuy,
-                zerocallbuy,
-                "b>",
-                strikeputbuy,
-                zeroputbuy,
-                "b<",
-                strikecallsell,
-                zerocallsell,
-                "r>",
-                strikeputsell,
-                zeroputsell,
-                "r<",
-                markersize=10,
-            )
-        else:
-            plt.plot(
-                self.__s,
-                zeroline,
-                "m--",
-                self.__s,
-                self.strategyprofit,
-                "k-",
-                strikecallbuy,
-                zerocallbuy,
-                "b>",
-                strikeputbuy,
-                zeroputbuy,
-                "b<",
-                strikecallsell,
-                zerocallsell,
-                "r>",
-                strikeputsell,
-                zeroputsell,
-                "r<",
-                markersize=10,
-            )
+            return self.s, self.strategyprofit
 
     """
     Properties
@@ -794,32 +553,12 @@ class StrategyEngine:
 
     @property
     def days2target(self):
-        return self.__days2target
+        return self.days_to_target
 
     @property
     def stockpricearray(self):
-        return self.__s
-
-    @stockpricearray.setter
-    def stockpricearray(self, s):
-        if isinstance(s, ndarray):
-            if s.shape[0] > 0:
-                self.__s = s
-            else:
-                raise ValueError("Empty stock price array is not allowed!")
-        else:
-            raise TypeError("A numpy array is expected!")
+        return self.s
 
     @property
     def terminalstockprices(self):
-        return self.__s_mc
-
-    @terminalstockprices.setter
-    def terminalstockprices(self, s):
-        if isinstance(s, ndarray):
-            if s.shape[0] > 0:
-                self.__s_mc = s
-            else:
-                raise ValueError("Empty terminal stock price array is not allowed!")
-        else:
-            raise TypeError("A numpy array is expected!")
+        return self.s_mc
