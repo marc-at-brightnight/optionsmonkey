@@ -161,7 +161,6 @@ class Inputs(BaseModel):
     opt_commission: float = 0.0
     stock_commission: float = 0.0
     compute_expectation: bool = False
-    use_dates: bool = True
     discard_nonbusiness_days: bool = True
     country: Country = "US"
     start_date: dt.date = Field(default_factory=dt.date.today)

@@ -46,22 +46,9 @@ class StrategyEngine:
         self.profit_target_range: list[float] = []
         self.loss_limit_ranges: list[float] = []
         self.days_to_maturity: list[float] = []
-        self.stock_price = None
-        self.volatility = None
         self.start_date = inputs.start_date
-        self.r = None
-        self.y = 0.0
-        self.profit_target = None
-        self.loss_limit = None
-        self.opt_commission = 0.0
-        self.stock_commission = 0.0
-        self.min_stock = None
-        self.max_stock = None
-        self.distribution = "black-scholes"
         self.country = "US"
         self.days_to_target = 30
-        self.nmc_prices = 100e3
-        self.compute_expectation = False
         self.discard_nonbusinessdays = True
         self.days_in_year = 252
         self.impvol: list[float] = []
@@ -74,13 +61,22 @@ class StrategyEngine:
         self.profitprob = 0.0
         self.profittargprob = 0.0
         self.losslimitprob = 0.0
-
+        self.distribution = inputs.distribution
+        self.stock_price = inputs.stock_price
+        self.volatility = inputs.volatility
+        self.r = inputs.interest_rate
+        self.y = inputs.dividend_yield
+        self.min_stock = inputs.min_stock
+        self.max_stock = inputs.max_stock
+        self.profit_target = inputs.profit_target
+        self.loss_limit = inputs.loss_limit
+        self.opt_commission = inputs.opt_commission
+        self.stock_commission = inputs.stock_commission
+        self.nmc_prices = inputs.nmc_prices
+        self.compute_expectation = inputs.compute_expectation
         self.discard_nonbusinessdays = inputs.discard_nonbusiness_days
 
-        if self.discard_nonbusinessdays:
-            self.days_in_year = 252
-        else:
-            self.days_in_year = 365
+        self.days_in_year = 252 if self.discard_nonbusinessdays else 365
 
         self.country = inputs.country
 
@@ -157,20 +153,6 @@ class StrategyEngine:
             else:
                 raise ValueError("Type must be 'call', 'put', 'stock' or 'closed'!")
 
-        self.distribution = inputs.distribution
-        self.stock_price = inputs.stock_price
-        self.volatility = inputs.volatility
-        self.r = inputs.interest_rate
-        self.y = inputs.dividend_yield
-        self.min_stock = inputs.min_stock
-        self.max_stock = inputs.max_stock
-        self.profit_target = inputs.profit_target
-        self.loss_limit = inputs.loss_limit
-        self.opt_commission = inputs.opt_commission
-        self.stock_commission = inputs.stock_commission
-        self.nmc_prices = inputs.nmc_prices
-        self.compute_expectation = inputs.compute_expectation
-        self.use_dates = inputs.use_dates
 
     def run(self):
         """
