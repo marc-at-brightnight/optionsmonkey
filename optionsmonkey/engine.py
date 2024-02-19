@@ -153,7 +153,6 @@ class StrategyEngine:
             else:
                 raise ValueError("Type must be 'call', 'put', 'stock' or 'closed'!")
 
-
     def run(self):
         """
         run -> runs calculations for an options strategy.
