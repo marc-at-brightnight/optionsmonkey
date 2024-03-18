@@ -1,6 +1,7 @@
 import pytest
 import datetime as dt
 
+
 @pytest.fixture
 def nvidia():
     stockprice = 168.99

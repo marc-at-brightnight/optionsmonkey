@@ -18,13 +18,13 @@ def test_covered_call(nvidia):
                     "premium": 4.1,
                     "n": 100,
                     "action": "sell",
+                    "expiration": nvidia["target_date"],
                 },
             ],
         )
     )
 
-    st = StrategyEngine()
-    st.getdata(inputs)
+    st = StrategyEngine(inputs)
     outputs = st.run()
 
     # Print useful information on screen
@@ -53,20 +53,20 @@ def test_covered_call_w_prev_position(nvidia):
         | dict(
             # The covered call strategy is defined
             strategy=[
-                {"type": "stock", "n": 100, "action": "buy", "prevpos": 158.99},
+                {"type": "stock", "n": 100, "action": "buy", "prev_pos": 158.99},
                 {
                     "type": "call",
                     "strike": 185.0,
                     "premium": 4.1,
                     "n": 100,
                     "action": "sell",
+                    "expiration": nvidia["target_date"],
                 },
             ]
         )
     )
 
-    st = StrategyEngine()
-    st.getdata(inputs)
+    st = StrategyEngine(inputs)
     outputs = st.run()
 
     # Print useful information on screen
@@ -100,7 +100,8 @@ def test_100_perc_itm(nvidia):
                     "premium": 12.65,
                     "n": 100,
                     "action": "buy",
-                    "prevpos": 7.5,
+                    "prev_pos": 7.5,
+                    "expiration": nvidia["target_date"],
                 },
                 {
                     "type": "call",
@@ -108,13 +109,13 @@ def test_100_perc_itm(nvidia):
                     "premium": 9.9,
                     "n": 100,
                     "action": "sell",
+                    "expiration": nvidia["target_date"],
                 },
             ]
         )
     )
 
-    st = StrategyEngine()
-    st.getdata(inputs)
+    st = StrategyEngine(inputs)
     outputs = st.run()
 
     # Print useful information on screen

@@ -9,6 +9,7 @@ from optionsmonkey.models import Country
 
 # TODO: convert to JSON
 
+
 def getholidays(country: Country):
     if country == "US":
         return __getholidaysUS__()
